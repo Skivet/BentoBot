@@ -1,5 +1,5 @@
-import discord, os, json, requests, random, sqlite3
-import commands, log
+import discord, os, json, requests, random
+import commands, log, db
 
 # load cfg
 with open('config.json') as cfg_file:
@@ -16,14 +16,6 @@ def reddit_link(subreddit):
 
     return link
 
-def add_quote(message):
-    conn = sqlite3.connect('quotes.db')
-    conn.execute('CREATE TABLE IF NOT EXISTS quotes (string quote, string auth, datetime date)')
-
-    quote = message.content[10:]
-    auth = message.author.display_name
-    date = message.created_at
-    conn.execute('INSERT INTO quotes VALUES(?,?,?)',(quote, auth, date))
 
 class BentoClient(discord.Client):
     async def on_ready(self):
@@ -31,10 +23,12 @@ class BentoClient(discord.Client):
         await client.change_presence(activity = discord.Game(name = '!help'))
 
     async def on_message(self, message):
-
+        
+        # verify message is not from self
         if message.author == self.user:
             return
 
+        # check for command prefix
         if message.content[:1] == '!':
             print('command detected - ' + message.content)
 
@@ -61,10 +55,18 @@ class BentoClient(discord.Client):
                 await message.channel.send(link)
             
             elif command == 'addquote':
-                add_quote(message)
-                await message.channel.send('quote saved.')
+                db.add_quote(message)
+                await message.channel.send('quote saved')
+
+            elif command == 'quote':
+                quote, author, datetime = db.get_quote()
+                embed = discord.Embed(description=quote, color=0x10FFFF)
+                embed.add_field(name='author', value=f'<@{author}>')
+                embed.add_field(name='date', value=datetime[:10])
+                await message.channel.send(embed=embed)
+
             else:
-                await message.channel.send('Bruv what the fuck are you saying?')            
+                await message.channel.send('invalid command')            
 
 client = BentoClient()
 
